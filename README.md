@@ -25,7 +25,7 @@ TODO
 TODO
 
 *First block diagram of the idea*  
-![First block diagram of the idea](./diagrams/block.jpg)
+![First block diagram of the idea](./diagrams/block.drawio.png)
 
 ## Sources, License & Acknowledgements
 
