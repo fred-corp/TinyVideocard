@@ -18,15 +18,19 @@ Se, when we had to choose a project for our microelectronics course, I decided t
 
 ## What
 
-> TODO
+TODO
 
 ## How
 
-> TODO
+TODO
+
+*First block diagram of the idea*  
+![First block diagram of the idea](./diagrams/block.jpg)
 
 ## Sources, License & Acknowledgements
 
 - *Let's build a video card!*, Ben Eater, 2019, [eater.net/vga](https://eater.net/vga)
+- TinyTapeout design guides, [tinytapeout.com](https://tinytapeout.com)
 
 Made with ❤️, lots of ☕️, and lack of 🛌
 
