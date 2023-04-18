@@ -1,4 +1,4 @@
-# TinyGPU
+# TinyVideocard
 
 A Tiny VGA Output generator project for TinyTapeout.
 
@@ -23,7 +23,6 @@ Se, when we had to choose a project for our microelectronics course, I decided t
 ## How
 
 > TODO
-
 
 ## Sources, License & Acknowledgements
 
