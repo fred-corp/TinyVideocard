@@ -29,27 +29,22 @@ architecture rtl of video_card is
 
 begin
 
-  process (reset) is
-  begin
-
-    if (reset = '0') then
-      line_state  <= active;
-      frame_state <= active;
-      hsync_count <= 0;
-      vsync_count <= 0;
-      hsync_o     <= '0';
-      vsync_o     <= '0';
-    -- red         <= "00";
-    -- green       <= "00";
-    -- blue        <= "00";
-    end if;
-
-  end process;
-
   process (clk) is
   begin
 
     if rising_edge(clk) then
+      if (reset = '0') then
+        line_state  <= active;
+        frame_state <= active;
+        hsync_count <= 0;
+        vsync_count <= 0;
+        hsync_o     <= '0';
+        vsync_o     <= '0';
+      -- red         <= "00";
+      -- green       <= "00";
+      -- blue        <= "00";
+      end if;
+
       hsync_count <= hsync_count + 1;
 
       if (hsync_count = 264) then
@@ -108,57 +103,47 @@ begin
 
       end case;
 
+      case line_state is
+
+        when active =>
+
+          hsync_o <= '1';
+
+        when front =>
+
+          hsync_o <= '1';
+
+        when sync =>
+
+          hsync_o <= '0';
+
+        when back =>
+
+          hsync_o <= '1';
+
+      end case;
+
+      case frame_state is
+
+        when active =>
+
+          vsync_o <= '1';
+
+        when front =>
+
+          vsync_o <= '1';
+
+        when sync =>
+
+          vsync_o <= '0';
+
+        when back =>
+
+          vsync_o <= '1';
+
+      end case;
+
     end if;
-
-  end process;
-
-  process (line_state) is
-  begin
-
-    case line_state is
-
-      when active =>
-
-        hsync_o <= '1';
-
-      when front =>
-
-        hsync_o <= '1';
-
-      when sync =>
-
-        hsync_o <= '0';
-
-      when back =>
-
-        hsync_o <= '1';
-
-    end case;
-
-  end process;
-
-  process (frame_state) is
-  begin
-
-    case frame_state is
-
-      when active =>
-
-        vsync_o <= '1';
-
-      when front =>
-
-        vsync_o <= '1';
-
-      when sync =>
-
-        vsync_o <= '0';
-
-      when back =>
-
-        vsync_o <= '1';
-
-    end case;
 
   end process;
 
