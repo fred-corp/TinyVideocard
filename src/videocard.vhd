@@ -5,26 +5,23 @@ library ieee;
 
 entity video_card is
   port (
-    clk      : in    std_logic;
-    reset    : in    std_logic;
+    clk   : in    std_logic;
+    reset : in    std_logic;
     -- data_sda : in    std_logic;
     -- data_scl : in    std_logic;
 
-    hsync : out   std_logic;
-    vsync : out   std_logic;
-    -- red   : out   std_logic_vector(1 downto 0);
-    -- green : out   std_logic_vector(1 downto 0);
-    -- blue  : out   std_logic_vector(1 downto 0)
+    hsync_o : out   std_logic;
+    vsync_o : out   std_logic
+  -- red   : out   std_logic_vector(1 downto 0);
+  -- green : out   std_logic_vector(1 downto 0);
+  -- blue  : out   std_logic_vector(1 downto 0)
   );
 end entity video_card;
 
 architecture rtl of video_card is
 
-  type state_type is (idle, hsync, vsync, data);
-
   type lf_state is (active, front, sync, back);
 
-  signal state       : state_type;
   signal line_state  : lf_state;
   signal frame_state : lf_state;
   signal hsync_count : integer range 0 to 264;
@@ -35,17 +32,16 @@ begin
   process (reset) is
   begin
 
-    if reset = 0 then
-      state       <= idle;
+    if (reset = '0') then
       line_state  <= active;
       frame_state <= active;
       hsync_count <= 0;
       vsync_count <= 0;
-      hsync       <= '0';
-      vsync       <= '0';
-      red         <= "00";
-      green       <= "00";
-      blue        <= "00";
+      hsync_o     <= '0';
+      vsync_o     <= '0';
+    -- red         <= "00";
+    -- green       <= "00";
+    -- blue        <= "00";
     end if;
 
   end process;
@@ -118,54 +114,52 @@ begin
 
   process (line_state) is
   begin
-      
-      case line_state is
-  
-        when active =>
-  
-          hsync <= '1';
-  
-        when front =>
-  
-          hsync <= '1';
-  
-        when sync =>
-  
-          hsync <= '0';
-  
-        when back =>
-  
-          hsync <= '1';
-  
-      end case;
-  
+
+    case line_state is
+
+      when active =>
+
+        hsync_o <= '1';
+
+      when front =>
+
+        hsync_o <= '1';
+
+      when sync =>
+
+        hsync_o <= '0';
+
+      when back =>
+
+        hsync_o <= '1';
+
+    end case;
+
   end process;
 
   process (frame_state) is
   begin
-      
-      case frame_state is
-  
-        when active =>
-  
-          vsync <= '1';
-  
-        when front =>
-  
-          vsync <= '1';
-  
-        when sync =>
-  
-          vsync <= '0';
-  
-        when back =>
-  
-          vsync <= '1';
-  
-      end case;
-  
+
+    case frame_state is
+
+      when active =>
+
+        vsync_o <= '1';
+
+      when front =>
+
+        vsync_o <= '1';
+
+      when sync =>
+
+        vsync_o <= '0';
+
+      when back =>
+
+        vsync_o <= '1';
+
+    end case;
+
   end process;
-
-
 
 end architecture rtl;
