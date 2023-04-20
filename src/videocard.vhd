@@ -11,10 +11,10 @@ entity video_card is
     -- data_scl : in    std_logic;
 
     hsync_o : out   std_logic;
-    vsync_o : out   std_logic
-  -- red   : out   std_logic_vector(1 downto 0);
-  -- green : out   std_logic_vector(1 downto 0);
-  -- blue  : out   std_logic_vector(1 downto 0)
+    vsync_o : out   std_logic;
+    red     : out   std_logic_vector(1 downto 0);
+    green   : out   std_logic_vector(1 downto 0);
+    blue    : out   std_logic_vector(1 downto 0)
   );
 end entity video_card;
 
@@ -40,109 +40,109 @@ begin
         vsync_count <= 0;
         hsync_o     <= '0';
         vsync_o     <= '0';
-      -- red         <= "00";
-      -- green       <= "00";
-      -- blue        <= "00";
+        red         <= "00";
+        green       <= "00";
+        blue        <= "00";
+      else
+        hsync_count <= hsync_count + 1;
+
+        if (hsync_count = 264) then
+          hsync_count <= 0;
+          vsync_count <= vsync_count + 1;
+        end if;
+        if (vsync_count = 628) then
+          vsync_count <= 0;
+        end if;
+
+        case hsync_count is
+
+          when 0 =>
+
+            line_state <= active;
+
+          when 200 =>
+
+            line_state <= front;
+
+          when 210 =>
+
+            line_state <= sync;
+
+          when 242 =>
+
+            line_state <= back;
+
+          when others =>
+
+            null;
+
+        end case;
+
+        case vsync_count is
+
+          when 0 =>
+
+            frame_state <= active;
+
+          when 600 =>
+
+            frame_state <= front;
+
+          when 601 =>
+
+            frame_state <= sync;
+
+          when 605 =>
+
+            frame_state <= back;
+
+          when others =>
+
+            null;
+
+        end case;
+
+        case line_state is
+
+          when active =>
+
+            hsync_o <= '1';
+
+          when front =>
+
+            hsync_o <= '1';
+
+          when sync =>
+
+            hsync_o <= '0';
+
+          when back =>
+
+            hsync_o <= '1';
+
+        end case;
+
+        case frame_state is
+
+          when active =>
+
+            vsync_o <= '1';
+
+          when front =>
+
+            vsync_o <= '1';
+
+          when sync =>
+
+            vsync_o <= '0';
+
+          when back =>
+
+            vsync_o <= '1';
+
+        end case;
+
       end if;
-
-      hsync_count <= hsync_count + 1;
-
-      if (hsync_count = 264) then
-        hsync_count <= 0;
-        vsync_count <= vsync_count + 1;
-      end if;
-      if (vsync_count = 628) then
-        vsync_count <= 0;
-      end if;
-
-      case hsync_count is
-
-        when 0 =>
-
-          line_state <= active;
-
-        when 200 =>
-
-          line_state <= front;
-
-        when 210 =>
-
-          line_state <= sync;
-
-        when 242 =>
-
-          line_state <= back;
-
-        when others =>
-
-          null;
-
-      end case;
-
-      case vsync_count is
-
-        when 0 =>
-
-          frame_state <= active;
-
-        when 600 =>
-
-          frame_state <= front;
-
-        when 601 =>
-
-          frame_state <= sync;
-
-        when 605 =>
-
-          frame_state <= back;
-
-        when others =>
-
-          null;
-
-      end case;
-
-      case line_state is
-
-        when active =>
-
-          hsync_o <= '1';
-
-        when front =>
-
-          hsync_o <= '1';
-
-        when sync =>
-
-          hsync_o <= '0';
-
-        when back =>
-
-          hsync_o <= '1';
-
-      end case;
-
-      case frame_state is
-
-        when active =>
-
-          vsync_o <= '1';
-
-        when front =>
-
-          vsync_o <= '1';
-
-        when sync =>
-
-          vsync_o <= '0';
-
-        when back =>
-
-          vsync_o <= '1';
-
-      end case;
-
     end if;
 
   end process;
