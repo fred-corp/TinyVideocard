@@ -22,17 +22,21 @@ architecture rtl of video_card is
 
   type lf_state is (active, front, sync, back);
 
+  type t_framebuffer is array (0 to 99, 0 to 74) of std_logic_vector(5 downto 0);
+
   signal line_state  : lf_state;
   signal frame_state : lf_state;
   signal hsync_count : integer range 0 to 264;
   signal vsync_count : integer range 0 to 628;
+  signal framebuffer : t_framebuffer;
 
 begin
 
-  process (clk) is
+  process_clk : process (clk) is
   begin
 
     if rising_edge(clk) then
+      -- Handle Reset
       if (reset = '0') then
         line_state  <= active;
         frame_state <= active;
@@ -43,7 +47,9 @@ begin
         red         <= "00";
         green       <= "00";
         blue        <= "00";
+        framebuffer <= (others => (others => (others => '0')));
       else
+        -- Count lines and frames
         hsync_count <= hsync_count + 1;
 
         if (hsync_count = 264) then
@@ -54,6 +60,7 @@ begin
           vsync_count <= 0;
         end if;
 
+        -- Set line and frame states
         case hsync_count is
 
           when 0 =>
@@ -102,6 +109,7 @@ begin
 
         end case;
 
+        -- Generate HSYNC
         case line_state is
 
           when active =>
@@ -122,6 +130,7 @@ begin
 
         end case;
 
+        -- Generate VSYNC
         case frame_state is
 
           when active =>
@@ -142,9 +151,19 @@ begin
 
         end case;
 
+        -- Generate RGB from framebuffer
+        if ((line_state = active) and (frame_state = active)) then
+          red   <= framebuffer(hsync_count / 2, vsync_count / 8)(5 downto 4);
+          green <= framebuffer(hsync_count / 2, vsync_count / 8)(3 downto 2);
+          blue  <= framebuffer(hsync_count / 2, vsync_count / 8)(1 downto 0);
+        else
+          red   <= "00";
+          green <= "00";
+          blue  <= "00";
+        end if;
       end if;
     end if;
 
-  end process;
+  end process process_clk;
 
 end architecture rtl;
