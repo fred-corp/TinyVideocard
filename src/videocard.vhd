@@ -5,7 +5,7 @@ library ieee;
 
 entity video_card is
   port (
-    -- Master Clock and reset
+    -- Main Clock and reset
     clk : in    std_logic;
     rst : in    std_logic;
 
@@ -16,7 +16,7 @@ entity video_card is
     spi_cs : in    std_logic;
 
     -- SPI RAM interface
-    -- ram_sck  : out   std_logic;
+    ram_sck  : out   std_logic;
     -- ram_mosi : out   std_logic;
     -- ram_miso : in    std_logic;
     -- ram_cs   : out   std_logic;
@@ -60,7 +60,7 @@ architecture rtl of video_card is
 
   type framebuffer_t is array (0 to 7500) of std_logic_vector(3 downto 0);
 
-  type videocard_state_t is (display, reset, write, idle);
+  type videocard_state_t is (display, reset, init, idle);
 
   signal videocard_state : videocard_state_t;
 
@@ -78,7 +78,7 @@ begin
     -- Handle master clock
     if rising_edge(clk) then
       -- Handle Reset
-      if (rst = '0') then
+      if ((rst = '0') or videocard_state = reset) then
         spi_state        <= control;
         spi_data_pointer <= 0;
 
@@ -92,36 +92,125 @@ begin
         green       <= "00";
         blue        <= "00";
         framebuffer <= (others => (others => '0'));
+
+        videocard_state <= init;
       else
-        -- Count lines and frames
-        hsync_count <= hsync_count + 1;
 
-        if (hsync_count = whole_line) then
-          hsync_count <= 0;
-          vsync_count <= vsync_count + 1;
-        end if;
-        if (vsync_count = whole_frame) then
-          vsync_count <= 0;
-        end if;
+        case videocard_state is
 
-        -- Set line and frame states
-        case hsync_count is
+          when init =>
 
-          when 0 =>
+          -- TODO : initialize RAM to sequential mode, write zeros on all pages
 
-            line_state <= active;
+          when display =>
 
-          when h_visible_area =>
+            -- Handle RAM
 
-            line_state <= front;
+            -- Generate RAM clock (20MHz) from main clock;
+            -- divide frequency by two if scaler = 1
+            -- keep frequency if scaler = 2
+            if (clock_scaler = 2) then
+              ram_sck <= clk;
+            elsif (clock_scaler = 1) then
+              ram_sck <= not ram_sck;
+            end if;
 
-          when h_front_porch =>
+            -- Count lines and frames
+            hsync_count <= hsync_count + 1;
 
-            line_state <= sync;
+            if (hsync_count = whole_line) then
+              hsync_count <= 0;
+              vsync_count <= vsync_count + 1;
+            end if;
+            if (vsync_count = whole_frame) then
+              vsync_count <= 0;
+            end if;
 
-          when h_sync_pulse =>
+            -- Set line and frame states
+            case hsync_count is
 
-            line_state <= back;
+              when 0 =>
+
+                line_state <= active;
+
+              when h_visible_area =>
+
+                line_state <= front;
+
+              when h_front_porch =>
+
+                line_state <= sync;
+
+              when h_sync_pulse =>
+
+                line_state <= back;
+
+              when others =>
+
+                null;
+
+            end case;
+
+            case vsync_count is
+
+              when 0 =>
+
+                frame_state <= active;
+
+              when v_visible_area =>
+
+                frame_state <= front;
+
+              when v_front_porch =>
+
+                frame_state <= sync;
+
+              when v_sync_pulse =>
+
+                frame_state <= back;
+
+              when others =>
+
+                null;
+
+            end case;
+
+            -- Generate HSYNC
+            case line_state is
+
+              when sync =>
+
+                hsync_o <= '0';
+
+              when others =>
+
+                hsync_o <= '1';
+
+            end case;
+
+            -- Generate VSYNC
+            case frame_state is
+
+              when sync =>
+
+                vsync_o <= '0';
+
+              when others =>
+
+                vsync_o <= '1';
+
+            end case;
+
+            -- Generate RGB from framebuffer
+            if ((line_state = active) and (frame_state = active)) then
+              red(0)   <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(3);
+              green(0) <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(2);
+              blue(0)  <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(1);
+            else
+              red   <= "00";
+              green <= "00";
+              blue  <= "00";
+            end if;
 
           when others =>
 
@@ -129,66 +218,6 @@ begin
 
         end case;
 
-        case vsync_count is
-
-          when 0 =>
-
-            frame_state <= active;
-
-          when v_visible_area =>
-
-            frame_state <= front;
-
-          when v_front_porch =>
-
-            frame_state <= sync;
-
-          when v_sync_pulse =>
-
-            frame_state <= back;
-
-          when others =>
-
-            null;
-
-        end case;
-
-        -- Generate HSYNC
-        case line_state is
-
-          when sync =>
-
-            hsync_o <= '0';
-
-          when others =>
-
-            hsync_o <= '1';
-
-        end case;
-
-        -- Generate VSYNC
-        case frame_state is
-
-          when sync =>
-
-            vsync_o <= '0';
-
-          when others =>
-
-            vsync_o <= '1';
-
-        end case;
-
-        -- Generate RGB from framebuffer
-        if ((line_state = active) and (frame_state = active)) then
-          red(0)   <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(3);
-          green(0) <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(2);
-          blue(0)  <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(1);
-        else
-          red   <= "00";
-          green <= "00";
-          blue  <= "00";
-        end if;
       end if;
 
     -- Handle SPI interface
