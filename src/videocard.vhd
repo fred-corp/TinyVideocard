@@ -6,17 +6,20 @@ library ieee;
 entity video_card is
   port (
     -- Master Clock and reset
-    clk   : in    std_logic;
-    reset : in    std_logic;
+    clk : in    std_logic;
+    rst : in    std_logic;
 
     -- SPI control interface
     spi_sck  : in    std_logic;
     spi_mosi : in    std_logic;
-    spi_miso : out   std_logic;
+    -- spi_miso : out   std_logic;
     spi_cs   : in    std_logic;
 
     -- SPI RAM interface
-    -- TODO
+    -- ram_sck  : out   std_logic;
+    -- ram_mosi : out   std_logic;
+    -- ram_miso : in    std_logic;
+    -- ram_cs   : out   std_logic;
 
     -- VGA out
     hsync_o : out   std_logic;
@@ -33,34 +36,48 @@ architecture rtl of video_card is
   constant h_visible_area : integer := 800;
   constant h_front_porch  : integer := 10;
   constant h_sync_pulse   : integer := 128;
-  constant h_back_porch   : integer : 88;
-  constant whole_line    : integer := 1056;
+  constant h_back_porch   : integer := 88;
+  constant whole_line     : integer := 1056;
 
   -- Vertical timing constants
   constant v_visible_area : integer := 600;
   constant v_front_porch  : integer := 1;
   constant v_sync_pulse   : integer := 4;
-  constant v_back_porch   : integer : 23;
+  constant v_back_porch   : integer := 23;
   constant whole_frame    : integer := 628;
 
-  type lf_state is (active, front, sync, back);
+  type spi_state_t is (control, data);
 
-  type t_framebuffer is array (0 to 99, 0 to 74) of std_logic_vector(5 downto 0);
+  signal spi_state        : spi_state_t;
+  signal spi_reg          : std_logic_vector(7 downto 0);
+  signal spi_data_pointer : integer range 0 to 7500;
 
-  signal line_state  : lf_state;
-  signal frame_state : lf_state;
+  type lf_state_t is (active, front, sync, back);
+
+  type framebuffer_t is array (0 to 7500) of std_logic_vector(3 downto 0);
+
+  type videocard_state_t is (display, reset, write, idle);
+
+  signal videocard_state : videocard_state_t;
+
+  signal line_state  : lf_state_t;
+  signal frame_state : lf_state_t;
   signal hsync_count : integer range 0 to 1056;
   signal vsync_count : integer range 0 to 628;
-  signal framebuffer : t_framebuffer;
+  signal framebuffer : framebuffer_t;
 
 begin
 
-  process_clk : process (clk) is
+  process_clk : process (clk, rst, spi_sck) is
   begin
 
+    -- Handle master clock
     if rising_edge(clk) then
       -- Handle Reset
-      if (reset = '0') then
+      if (rst = '0') then
+        spi_state        <= control;
+        spi_data_pointer <= 0;
+
         line_state  <= active;
         frame_state <= active;
         hsync_count <= 0;
@@ -70,7 +87,7 @@ begin
         red         <= "00";
         green       <= "00";
         blue        <= "00";
-        framebuffer <= (others => (others => (others => '0')));
+        framebuffer <= (others => (others => '0'));
       else
         -- Count lines and frames
         hsync_count <= hsync_count + 1;
@@ -138,7 +155,7 @@ begin
           when sync =>
 
             hsync_o <= '0';
-          
+
           when others =>
 
             hsync_o <= '1';
@@ -151,7 +168,7 @@ begin
           when sync =>
 
             vsync_o <= '0';
-          
+
           when others =>
 
             vsync_o <= '1';
@@ -160,15 +177,59 @@ begin
 
         -- Generate RGB from framebuffer
         if ((line_state = active) and (frame_state = active)) then
-          red   <= framebuffer(hsync_count / 2, vsync_count / 8)(5 downto 4);
-          green <= framebuffer(hsync_count / 2, vsync_count / 8)(3 downto 2);
-          blue  <= framebuffer(hsync_count / 2, vsync_count / 8)(1 downto 0);
+          red(0)   <= framebuffer((vsync_count / 8) * 75 + hsync_count / 4)(3);
+          green(0) <= framebuffer((vsync_count / 8) * 75 + hsync_count / 4)(2);
+          blue(0)  <= framebuffer((vsync_count / 8) * 75 + hsync_count / 4)(1);
         else
           red   <= "00";
           green <= "00";
           blue  <= "00";
         end if;
       end if;
+
+    -- Handle SPI interface
+    elsif rising_edge(spi_sck) then
+      if (spi_cs = '0') then
+        spi_reg <= spi_reg(6 downto 0) & spi_mosi;
+      end if;
+    end if;
+
+    if (spi_cs = '1') then
+
+      case spi_state is
+
+        when control =>
+
+          case spi_reg is
+
+            when "00000001" =>
+
+              spi_state <= data;
+
+            when others =>
+
+              null;
+
+          end case;
+
+        when data =>
+
+          if (spi_data_pointer = 7500) then
+            spi_state        <= control;
+            spi_data_pointer <= 0;
+          else
+            framebuffer(2 to 7499) <= framebuffer(0 to 7497);
+            framebuffer(0)         <= spi_reg(3 downto 0);
+            framebuffer(1)         <= spi_reg(7 downto 4);
+            spi_data_pointer       <= spi_data_pointer + 1;
+          end if;
+
+        when others =>
+
+          null;
+
+      end case;
+
     end if;
 
   end process process_clk;
