@@ -7,8 +7,11 @@ entity video_card is
   port (
     clk   : in    std_logic;
     reset : in    std_logic;
-    -- data_sda : in    std_logic;
-    -- data_scl : in    std_logic;
+
+    spi_sck  : in    std_logic;
+    spi_mosi : in    std_logic;
+    spi_miso : out   std_logic;
+    spi_cs   : in    std_logic;
 
     hsync_o : out   std_logic;
     vsync_o : out   std_logic;
@@ -20,13 +23,27 @@ end entity video_card;
 
 architecture rtl of video_card is
 
+  -- Horizontal timing
+  constant h_visible_area : integer := 800;
+  constant h_front_porch  : integer := 10;
+  constant h_sync_pulse   : integer := 128;
+  constant h_back_porch   : integer : 88;
+  constant whole_line    : integer := 1056;
+
+  -- Vertical timing
+  constant v_visible_area : integer := 600;
+  constant v_front_porch  : integer := 1;
+  constant v_sync_pulse   : integer := 4;
+  constant v_back_porch   : integer : 23;
+  constant whole_frame    : integer := 628;
+
   type lf_state is (active, front, sync, back);
 
   type t_framebuffer is array (0 to 99, 0 to 74) of std_logic_vector(5 downto 0);
 
   signal line_state  : lf_state;
   signal frame_state : lf_state;
-  signal hsync_count : integer range 0 to 264;
+  signal hsync_count : integer range 0 to 1056;
   signal vsync_count : integer range 0 to 628;
   signal framebuffer : t_framebuffer;
 
@@ -52,11 +69,11 @@ begin
         -- Count lines and frames
         hsync_count <= hsync_count + 1;
 
-        if (hsync_count = 264) then
+        if (hsync_count = whole_line) then
           hsync_count <= 0;
           vsync_count <= vsync_count + 1;
         end if;
-        if (vsync_count = 628) then
+        if (vsync_count = whole_frame) then
           vsync_count <= 0;
         end if;
 
@@ -67,15 +84,15 @@ begin
 
             line_state <= active;
 
-          when 200 =>
+          when h_visible_area =>
 
             line_state <= front;
 
-          when 210 =>
+          when h_front_porch =>
 
             line_state <= sync;
 
-          when 242 =>
+          when h_sync_pulse =>
 
             line_state <= back;
 
@@ -91,15 +108,15 @@ begin
 
             frame_state <= active;
 
-          when 600 =>
+          when v_visible_area =>
 
             frame_state <= front;
 
-          when 601 =>
+          when v_front_porch =>
 
             frame_state <= sync;
 
-          when 605 =>
+          when v_sync_pulse =>
 
             frame_state <= back;
 
@@ -112,19 +129,11 @@ begin
         -- Generate HSYNC
         case line_state is
 
-          when active =>
-
-            hsync_o <= '1';
-
-          when front =>
-
-            hsync_o <= '1';
-
           when sync =>
 
             hsync_o <= '0';
-
-          when back =>
+          
+          when others =>
 
             hsync_o <= '1';
 
@@ -133,19 +142,11 @@ begin
         -- Generate VSYNC
         case frame_state is
 
-          when active =>
-
-            vsync_o <= '1';
-
-          when front =>
-
-            vsync_o <= '1';
-
           when sync =>
 
             vsync_o <= '0';
-
-          when back =>
+          
+          when others =>
 
             vsync_o <= '1';
 
