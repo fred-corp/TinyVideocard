@@ -249,6 +249,11 @@ begin
     -- Handle SPI interface
     elsif rising_edge(spi_sck) then
       if (spi_cs = '1') then
+        if (spi_state = dma) then
+          ram_cs   <= '1';
+          ram_mosi <= '0';
+        end if;
+
         spi_reg_pointer  <= 0;
         spi_data_pointer <= 0;
         spi_state        <= control;
