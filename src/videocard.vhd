@@ -49,7 +49,7 @@ architecture rtl of video_card is
   constant v_back_porch   : integer := 23;
   constant whole_frame    : integer := 628;
 
-  type spi_state_t is (control, data);
+  type spi_state_t is (control, data, dma);
 
   signal spi_state        : spi_state_t;
   signal spi_reg          : std_logic_vector(7 downto 0);
@@ -126,17 +126,19 @@ begin
               vsync_count <= whole_line - 24;
             end if;
 
-          when display =>
+          when display | idle =>
 
-            -- Handle RAM
+            if (videocard_state = display) then
+              -- Handle RAM
 
-            -- Generate RAM clock (20MHz) from main clock;
-            -- divide frequency by two if scaler = 1
-            -- keep frequency if scaler = 2
-            if (clock_scaler = 2) then
-              ram_sck <= clk;
-            elsif (clock_scaler = 1) then
-              ram_sck <= not ram_sck;
+              -- Generate RAM clock (20MHz) from main clock;
+              -- divide frequency by two if scaler = 1
+              -- keep frequency if scaler = 2
+              if (clock_scaler = 2) then
+                ram_sck <= clk;
+              elsif (clock_scaler = 1) then
+                ram_sck <= not ram_sck;
+              end if;
             end if;
 
             -- Count lines and frames
@@ -265,7 +267,8 @@ begin
 
               when "00000001" =>
 
-                spi_state <= data;
+                spi_state       <= dma;
+                videocard_state <= idle;
 
               when others =>
 
@@ -285,12 +288,26 @@ begin
               spi_data_pointer       <= spi_data_pointer + 1;
             end if;
 
+          when dma =>
+
+            ram_cs   <= '0';
+            ram_mosi <= spi_mosi;
+            ram_miso <= spi_miso;
+            ram_sck  <= spi_sck;
+
           when others =>
 
             null;
 
         end case;
 
+      end if;
+    elsif falling_edge(spi_sck) then
+      if (spi_state = dma) then
+        ram_cs   <= '0';
+        ram_mosi <= spi_mosi;
+        ram_miso <= spi_miso;
+        ram_sck  <= spi_sck;
       end if;
     end if;
 
