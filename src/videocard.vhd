@@ -13,7 +13,7 @@ entity video_card is
     spi_sck  : in    std_logic;
     spi_mosi : in    std_logic;
     -- spi_miso : out   std_logic;
-    spi_cs   : in    std_logic;
+    spi_cs : in    std_logic;
 
     -- SPI RAM interface
     -- ram_sck  : out   std_logic;
@@ -32,12 +32,15 @@ end entity video_card;
 
 architecture rtl of video_card is
 
+  -- Clock scaler (1 : 40MHz, 2: 20MHz, 4: 10MHz)
+  constant clock_scaler : integer := 1;
+
   -- Horizontal timing constants
-  constant h_visible_area : integer := 800;
-  constant h_front_porch  : integer := 10;
-  constant h_sync_pulse   : integer := 128;
-  constant h_back_porch   : integer := 88;
-  constant whole_line     : integer := 1056;
+  constant h_visible_area : integer := 800 / clock_scaler;
+  constant h_front_porch  : integer := 40 / clock_scaler;
+  constant h_sync_pulse   : integer := 128 / clock_scaler;
+  constant h_back_porch   : integer := 88 / clock_scaler;
+  constant whole_line     : integer := 1056 / clock_scaler;
 
   -- Vertical timing constants
   constant v_visible_area : integer := 600;
@@ -50,6 +53,7 @@ architecture rtl of video_card is
 
   signal spi_state        : spi_state_t;
   signal spi_reg          : std_logic_vector(7 downto 0);
+  signal spi_reg_pointer  : integer range 0 to 7;
   signal spi_data_pointer : integer range 0 to 7500;
 
   type lf_state_t is (active, front, sync, back);
@@ -177,9 +181,9 @@ begin
 
         -- Generate RGB from framebuffer
         if ((line_state = active) and (frame_state = active)) then
-          red(0)   <= framebuffer((vsync_count / 8) * 75 + hsync_count / 4)(3);
-          green(0) <= framebuffer((vsync_count / 8) * 75 + hsync_count / 4)(2);
-          blue(0)  <= framebuffer((vsync_count / 8) * 75 + hsync_count / 4)(1);
+          red(0)   <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(3);
+          green(0) <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(2);
+          blue(0)  <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(1);
         else
           red   <= "00";
           green <= "00";
@@ -189,47 +193,52 @@ begin
 
     -- Handle SPI interface
     elsif rising_edge(spi_sck) then
-      if (spi_cs = '0') then
-        spi_reg <= spi_reg(6 downto 0) & spi_mosi;
+      if (spi_cs = '1') then
+        spi_reg_pointer  <= 0;
+        spi_data_pointer <= 0;
+        spi_state        <= control;
+      else
+        spi_reg         <= spi_reg(6 downto 0) & spi_mosi;
+        spi_reg_pointer <= spi_reg_pointer + 1;
       end if;
-    end if;
 
-    if (spi_cs = '1') then
+      if (spi_reg_pointer = 7) then
 
-      case spi_state is
+        case spi_state is
 
-        when control =>
+          when control =>
 
-          case spi_reg is
+            case spi_reg is
 
-            when "00000001" =>
+              when "00000001" =>
 
-              spi_state <= data;
+                spi_state <= data;
 
-            when others =>
+              when others =>
 
-              null;
+                null;
 
-          end case;
+            end case;
 
-        when data =>
+          when data =>
 
-          if (spi_data_pointer = 7500) then
-            spi_state        <= control;
-            spi_data_pointer <= 0;
-          else
-            framebuffer(2 to 7499) <= framebuffer(0 to 7497);
-            framebuffer(0)         <= spi_reg(3 downto 0);
-            framebuffer(1)         <= spi_reg(7 downto 4);
-            spi_data_pointer       <= spi_data_pointer + 1;
-          end if;
+            if (spi_data_pointer = 7500) then
+              spi_state        <= control;
+              spi_data_pointer <= 0;
+            else
+              framebuffer(2 to 7499) <= framebuffer(0 to 7497);
+              framebuffer(0)         <= spi_reg(3 downto 0);
+              framebuffer(1)         <= spi_reg(7 downto 4);
+              spi_data_pointer       <= spi_data_pointer + 1;
+            end if;
 
-        when others =>
+          when others =>
 
-          null;
+            null;
 
-      end case;
+        end case;
 
+      end if;
     end if;
 
   end process process_clk;
