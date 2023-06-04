@@ -17,9 +17,9 @@ entity video_card is
 
     -- SPI RAM interface
     ram_sck  : out   std_logic;
-    -- ram_mosi : out   std_logic;
-    -- ram_miso : in    std_logic;
-    -- ram_cs   : out   std_logic;
+    ram_mosi : out   std_logic;
+    ram_miso : in    std_logic;
+    ram_cs   : out   std_logic;
 
     -- VGA out
     hsync_o : out   std_logic;
@@ -64,6 +64,11 @@ architecture rtl of video_card is
 
   signal videocard_state : videocard_state_t;
 
+  constant ram_wrsr_addr : std_logic_vector(7 downto 0) := "00000001";
+  constant ram_wrsr_data : std_logic_vector(7 downto 0) := "01000001";
+
+  signal init_pointer : integer range 0 to (16 * (2 / clock_scaler));
+
   signal line_state  : lf_state_t;
   signal frame_state : lf_state_t;
   signal hsync_count : integer range 0 to 1056 / clock_scaler;
@@ -100,7 +105,26 @@ begin
 
           when init =>
 
-          -- TODO : initialize RAM to sequential mode, write zeros on all pages
+            -- Initialize RAM to sequential mode
+
+            if (init_pointer < (16 * (2 / clock_scaler))) then
+              ram_cs   <= '0';
+              ram_mosi <= ram_wrsr_addr(init_pointer / (2 / clock_scaler));
+              if (clock_scaler = 2) then
+                ram_sck <= clk;
+              elsif (clock_scaler = 1) then
+                ram_sck <= not ram_sck;
+              end if;
+              init_pointer <= init_pointer + 1;
+            else
+              ram_cs          <= '1';
+              videocard_state <= display;
+
+              -- Set videocard hsync & vsync count to be just before the first line,
+              -- leaving time to read the first pixel data
+              hsync_count <= whole_frame - 1;
+              vsync_count <= whole_line - 24;
+            end if;
 
           when display =>
 
