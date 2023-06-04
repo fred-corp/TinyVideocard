@@ -12,8 +12,8 @@ entity video_card is
     -- SPI control interface
     spi_sck  : in    std_logic;
     spi_mosi : in    std_logic;
-    -- spi_miso : out   std_logic;
-    spi_cs : in    std_logic;
+    spi_miso : out   std_logic;
+    spi_cs   : in    std_logic;
 
     -- SPI RAM interface
     ram_sck  : out   std_logic;
@@ -122,8 +122,8 @@ begin
 
               -- Set videocard hsync & vsync count to be just before the first line,
               -- leaving time to read the first pixel data
-              hsync_count <= whole_frame - 1;
-              vsync_count <= whole_line - 24;
+              vsync_count <= whole_frame - 1;
+              hsync_count <= whole_line - 24;
             end if;
 
           when display | idle =>
@@ -297,7 +297,7 @@ begin
 
             ram_cs   <= '0';
             ram_mosi <= spi_mosi;
-            ram_miso <= spi_miso;
+            spi_miso <= ram_miso;
             ram_sck  <= spi_sck;
 
           when others =>
@@ -311,7 +311,7 @@ begin
       if (spi_state = dma) then
         ram_cs   <= '0';
         ram_mosi <= spi_mosi;
-        ram_miso <= spi_miso;
+        spi_miso <= ram_miso;
         ram_sck  <= spi_sck;
       end if;
     end if;
