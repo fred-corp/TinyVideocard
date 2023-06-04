@@ -5,14 +5,20 @@ library ieee;
 
 entity video_card is
   port (
+    -- Master Clock and reset
     clk   : in    std_logic;
     reset : in    std_logic;
 
+    -- SPI control interface
     spi_sck  : in    std_logic;
     spi_mosi : in    std_logic;
     spi_miso : out   std_logic;
     spi_cs   : in    std_logic;
 
+    -- SPI RAM interface
+    -- TODO
+
+    -- VGA out
     hsync_o : out   std_logic;
     vsync_o : out   std_logic;
     red     : out   std_logic_vector(1 downto 0);
@@ -23,14 +29,14 @@ end entity video_card;
 
 architecture rtl of video_card is
 
-  -- Horizontal timing
+  -- Horizontal timing constants
   constant h_visible_area : integer := 800;
   constant h_front_porch  : integer := 10;
   constant h_sync_pulse   : integer := 128;
   constant h_back_porch   : integer : 88;
   constant whole_line    : integer := 1056;
 
-  -- Vertical timing
+  -- Vertical timing constants
   constant v_visible_area : integer := 600;
   constant v_front_porch  : integer := 1;
   constant v_sync_pulse   : integer := 4;
