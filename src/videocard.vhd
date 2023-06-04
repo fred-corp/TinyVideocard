@@ -66,7 +66,7 @@ architecture rtl of video_card is
 
   signal line_state  : lf_state_t;
   signal frame_state : lf_state_t;
-  signal hsync_count : integer range 0 to 1056;
+  signal hsync_count : integer range 0 to 1056 / clock_scaler;
   signal vsync_count : integer range 0 to 628;
   signal framebuffer : framebuffer_t;
 
