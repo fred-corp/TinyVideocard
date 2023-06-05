@@ -24,9 +24,9 @@ entity video_card is
     -- VGA out
     hsync_o : out   std_logic;
     vsync_o : out   std_logic;
-    red     : out   std_logic_vector(1 downto 0);
-    green   : out   std_logic_vector(1 downto 0);
-    blue    : out   std_logic_vector(1 downto 0)
+    red     : out   std_logic;
+    green   : out   std_logic;
+    blue    : out   std_logic
   );
 end entity video_card;
 
@@ -93,9 +93,9 @@ begin
         vsync_count <= 0;
         hsync_o     <= '0';
         vsync_o     <= '0';
-        red         <= "00";
-        green       <= "00";
-        blue        <= "00";
+        red         <= '0';
+        green       <= '0';
+        blue        <= '0';
         framebuffer <= (others => (others => '0'));
 
         videocard_state <= init;
@@ -229,13 +229,13 @@ begin
 
             -- Generate RGB from framebuffer
             if ((line_state = active) and (frame_state = active)) then
-              red(0)   <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(3);
-              green(0) <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(2);
-              blue(0)  <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(1);
+              red   <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(3);
+              green <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(2);
+              blue  <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(1);
             else
-              red   <= "00";
-              green <= "00";
-              blue  <= "00";
+              red   <= '0';
+              green <= '0';
+              blue  <= '0';
             end if;
 
           when others =>
