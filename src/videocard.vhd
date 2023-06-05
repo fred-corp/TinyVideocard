@@ -124,6 +124,8 @@ begin
               -- leaving time to read the first pixel data
               vsync_count <= whole_frame - 1;
               hsync_count <= whole_line - 24;
+              line_state  <= back;
+              frame_state <= back;
             end if;
 
           when display | idle =>
