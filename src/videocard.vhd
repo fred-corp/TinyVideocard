@@ -58,22 +58,24 @@ architecture rtl of video_card is
 
   type lf_state_t is (active, front, sync, back);
 
-  type framebuffer_t is array (0 to 7500) of std_logic_vector(3 downto 0);
-
   type videocard_state_t is (display, reset, init, idle);
 
   signal videocard_state : videocard_state_t;
 
-  constant ram_wrsr_addr : std_logic_vector(7 downto 0) := "00000001";
-  constant ram_wrsr_data : std_logic_vector(7 downto 0) := "01000001";
+  constant ram_wrsr_addr  : std_logic_vector(7 downto 0) := "00000001";
+  constant ram_wrsr_data  : std_logic_vector(7 downto 0) := "01000001";
+  constant ram_read_instr : std_logic_vector(7 downto 0) := "00000011";
 
-  signal init_pointer : integer range 0 to (16 * (2 / clock_scaler));
+  signal init_pointer        : integer range 0 to (16 * (2 / clock_scaler));
+  signal ram_data_pointer    : integer range 0 to 32;
+  signal ram_data_o_register : std_logic_vector(9 downto 0);
+  signal rampixelbuffer      : std_logic_vector(3 downto 0);
 
   signal line_state  : lf_state_t;
   signal frame_state : lf_state_t;
   signal hsync_count : integer range 0 to 1056 / clock_scaler;
   signal vsync_count : integer range 0 to 628;
-  signal framebuffer : framebuffer_t;
+  signal pixelbuffer : std_logic_vector(3 downto 0);
 
 begin
 
@@ -84,19 +86,24 @@ begin
     if rising_edge(clk) then
       -- Handle Reset
       if ((rst = '0') or videocard_state = reset) then
-        spi_state        <= control;
-        spi_data_pointer <= 0;
+        spi_state           <= control;
+        spi_data_pointer    <= 0;
+        init_pointer        <= 0;
+        ram_data_pointer    <= 0;
+        ram_data_o_register <= (others => '0');
 
-        line_state  <= active;
-        frame_state <= active;
-        hsync_count <= 0;
-        vsync_count <= 0;
-        hsync_o     <= '0';
-        vsync_o     <= '0';
-        red         <= '0';
-        green       <= '0';
-        blue        <= '0';
-        framebuffer <= (others => (others => '0'));
+        line_state     <= active;
+        frame_state    <= active;
+        hsync_count    <= 0;
+        vsync_count    <= 0;
+        hsync_o        <= '0';
+        vsync_o        <= '0';
+        red            <= '0';
+        green          <= '0';
+        blue           <= '0';
+        pixelbuffer    <= (others => '0');
+        rampixelbuffer <= (others => '0');
+        -- framebuffer <= (others => (others => '0'));
 
         videocard_state <= init;
       else
@@ -133,13 +140,61 @@ begin
             if (videocard_state = display) then
               -- Handle RAM
 
-              -- Generate RAM clock (20MHz) from main clock;
-              -- divide frequency by two if scaler = 1
-              -- keep frequency if scaler = 2
-              if (clock_scaler = 2) then
-                ram_sck <= clk;
-              elsif (clock_scaler = 1) then
-                ram_sck <= not ram_sck;
+              ram_data_o_register <= std_logic_vector(to_unsigned(vsync_count, ram_data_o_register'length));
+
+              -- Generate RAM clock (20MHz) from main clock (40MHz)
+              ram_sck <= not ram_sck;
+
+              -- if ram_sck is 0, put the next value on MOSI bus
+              if (ram_sck = '0') then
+
+                case hsync_count is
+
+                  -- Set read address before reading a new line
+                  when whole_line - 24 to whole_line =>
+
+                    ram_cs <= '0';
+
+                    case ram_data_pointer is
+
+                      when 0 to 7 =>
+
+                        ram_mosi <= ram_read_instr(ram_data_pointer);
+
+                      when 8 to 15 =>
+
+                        ram_mosi <= ram_data_o_register(ram_data_pointer - 6);
+
+                      when 16 to 23 =>
+
+                        ram_mosi <= '0';
+
+                      when others =>
+
+                        ram_mosi <= '0';
+
+                    end case;
+
+                  -- Read data from RAM
+                  when 0 to h_visible_area =>
+
+                    ram_cs         <= '0';
+                    rampixelbuffer <= rampixelbuffer(2 downto 0) & ram_miso;
+                    if (hsync_count mod 4 = 0) then
+                      pixelbuffer <= rampixelbuffer;
+                    end if;
+
+                  when others =>
+
+                    ram_cs           <= '1';
+                    ram_data_pointer <= 0;
+
+                    null;
+
+                end case;
+
+              else
+                ram_data_pointer <= ram_data_pointer + 1;
               end if;
             end if;
 
@@ -231,9 +286,9 @@ begin
 
             -- Generate RGB from framebuffer
             if ((line_state = active) and (frame_state = active)) then
-              red   <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(3);
-              green <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(2);
-              blue  <= framebuffer((hsync_count / (8 / clock_scaler)) + ((vsync_count / 8) * 100))(1);
+              red   <= pixelbuffer(3);
+              green <= pixelbuffer(2);
+              blue  <= pixelbuffer(1);
             else
               red   <= '0';
               green <= '0';
@@ -254,6 +309,8 @@ begin
         if (spi_state = dma) then
           ram_cs   <= '1';
           ram_mosi <= '0';
+
+          videocard_state <= display;
         end if;
 
         spi_reg_pointer  <= 0;
@@ -289,10 +346,11 @@ begin
               spi_state        <= control;
               spi_data_pointer <= 0;
             else
-              framebuffer(2 to 7499) <= framebuffer(0 to 7497);
-              framebuffer(0)         <= spi_reg(3 downto 0);
-              framebuffer(1)         <= spi_reg(7 downto 4);
-              spi_data_pointer       <= spi_data_pointer + 1;
+              null;
+            -- framebuffer(2 to 7499) <= framebuffer(0 to 7497);
+            -- framebuffer(0)         <= spi_reg(3 downto 0);
+            -- framebuffer(1)         <= spi_reg(7 downto 4);
+            -- spi_data_pointer       <= spi_data_pointer + 1;
             end if;
 
           when dma =>
