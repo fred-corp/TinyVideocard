@@ -64,6 +64,9 @@ TODO : complete
 *First block diagram of the idea*  
 ![First block diagram of the idea](./diagrams/block.drawio.png)
 
+*Second block diagram of the idea*
+![Second block diagram of the idea](./diagrams/block_ram.drawio.png)
+
 ## Sources, License & Acknowledgements
 
 - *Let's build a video card!*, Ben Eater, 2019, [eater.net/vga](https://eater.net/vga)
